@@ -1,14 +1,18 @@
-// Create an IntervalTimer object 
+// Create an IntervalTimer object
+#define USBSERIAL Serial  
 IntervalTimer myTimer;
-int counter=0
+int counter=0;
 const int ledPin = LED_BUILTIN;  // the pin with a LED
-int numChannels=18;
-int bufferLength=10000
-int buffer[numChannels][bufferLength]
+const int numChannels=18;
+const int bufferLength=1000;
+
+int buffer[bufferLength][numChannels];
 int bufferTail=0;
+int bufferHead=0;
 void setup() {
   pinMode(ledPin, OUTPUT);
-  Serial.begin(9600);
+  USBSERIAL.begin(9600);
+  USBSERIAL.setTimeout(0);
   myTimer.begin(getData, 100);  // blinkLED to run every 0.15 seconds
 }
 
@@ -21,21 +25,47 @@ void setup() {
 // possible, and should avoid calling other functions if possible.
 void getData() {
 // Put data into buffer
-for (int i=0;i<numChannels;i++)
-  buffer[i][buffertail]=counter-i;
+  for (int i=0;i<numChannels;i++){
+    buffer[bufferTail][i]=counter;
+  }
+  bufferTail++;
+  if(bufferTail>=bufferLength){
+    bufferTail=0;
+  }
+  counter++;
+  if(bufferHead==bufferTail){
+    USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss");
+    USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss");
+
+USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"); 
+USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"); 
+USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss");}
+  
 }
-bufferTail++;
 
 // The main program will print the blink count
 // to the Arduino Serial Monitor
 void loop() {
-  unsigned long blinkCopy;  // holds a copy of the blinkCount
+  while(bufferTail!=bufferHead){
+    String out="[";
+    for(int i=0;i<numChannels;i++){
+      out+=buffer[bufferHead][i];
+      out+=",";
+    }
+    USBSERIAL.print(out+"]");
+    bufferHead++;
+    if(bufferHead>=bufferLength){
+      bufferHead=0;
+    }
+    USBSERIAL.println("");
+  }
 
 
-  noInterrupts();
-  // blinkCopy = blinkCount;
-  interrupts();
+
+  // noInterrupts();
+  // // blinkCopy = blinkCount;
+  // interrupts();
 
   
-  delay(100);
+  // delay(100);
 }
