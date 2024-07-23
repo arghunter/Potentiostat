@@ -5,7 +5,7 @@ int counter=0;
 const int ledPin = LED_BUILTIN;  // the pin with a LED
 const int numChannels=18;
 const int bufferLength=1000;
-
+int flip=0;
 int buffer[bufferLength][numChannels];
 int bufferTail=0;
 int bufferHead=0;
@@ -34,30 +34,30 @@ void getData() {
   }
   counter++;
   if(bufferHead==bufferTail){
-    USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss");
-    USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss");
 
-USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"); 
-USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"); 
-USBSERIAL.println("hgkjhfkhfhgjdfgfsdfsdfsfdsfdgsssssssssssssssssssssssssssssssssssssssssssssssssssssssssss");}
+flip=1;}
   
 }
 
 // The main program will print the blink count
 // to the Arduino Serial Monitor
 void loop() {
+  if(flip==0){
   while(bufferTail!=bufferHead){
     String out="[";
     for(int i=0;i<numChannels;i++){
-      out+=buffer[bufferHead][i];
-      out+=",";
+      USBSERIAL.write(buffer[bufferHead][i]);
+      // out+=",";
     }
-    USBSERIAL.print(out+"]");
+    // USBSERIAL.write(out);
     bufferHead++;
     if(bufferHead>=bufferLength){
       bufferHead=0;
     }
     USBSERIAL.println("");
+  }
+  }else{
+    USBSERIAL.println("DFJKHFJKHESADFJKLAGSDFJLGAWKUFYGEFHBHMDSNHBVFJHTDSFVJHYKSDGFKUYWAEYGFOULEGUKfGKYTFE");
   }
 
 
