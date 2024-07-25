@@ -1,71 +1,79 @@
-// Create an IntervalTimer object
-#define USBSERIAL Serial  
-IntervalTimer myTimer;
-int counter=0;
-const int ledPin = LED_BUILTIN;  // the pin with a LED
-const int numChannels=18;
-const int bufferLength=1000;
-int flip=0;
-int buffer[bufferLength][numChannels];
-int bufferTail=0;
-int bufferHead=0;
+#include <Arduino.h>
+
+// Constants
+const int analogPins[] = {A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17};
+const int numPins = 18;
+const int sampleRate = 10000; // 10kHz
+const int bufferSize = numPins * 2; // Each reading is 2 bytes
+
+// Buffers for double buffering
+uint8_t buffer1[bufferSize];
+uint8_t buffer2[bufferSize];
+volatile uint8_t* writeBuffer = buffer1;
+volatile uint8_t* sendBuffer = buffer2;
+volatile bool bufferReady = false;
+volatile int bufferIndex = 0;
+bool flip=false;
+#define USBSERIAL Serial
+// Timer interrupt to read analog values
+IntervalTimer sampleTimer;
+uint16_t counter=0;
+void sampleData() {
+  for (int i = 0; i < numPins; i++) {
+    int sensorValue = analogRead(analogPins[i]);
+    writeBuffer[bufferIndex++] = counter & 0xFF; // Lower byte
+    writeBuffer[bufferIndex++] = counter>>8; // Upper byte
+    counter+=1;
+    if (bufferIndex >= bufferSize) {
+      bufferIndex = 0;
+      if(bufferReady){
+        flip=true;
+      }
+      bufferReady = true;
+      // Swap buffers
+      if (writeBuffer == buffer1) {
+        writeBuffer = buffer2;
+        sendBuffer = buffer1;
+      } else {
+        writeBuffer = buffer1;
+        sendBuffer = buffer2;
+      }
+    }
+  }
+}
+
 void setup() {
-  pinMode(ledPin, OUTPUT);
-  USBSERIAL.begin(9600);
-  USBSERIAL.setTimeout(0);
-  myTimer.begin(getData, 100);  // blinkLED to run every 0.15 seconds
+  Serial.begin(230400);
+  while (!Serial); // Wait for the Serial port to be available
+
+  // Initialize the analog pins
+  for (int i = 0; i < numPins; i++) {
+    pinMode(analogPins[i], INPUT);
+  }
+
+  // Configure the ADC for higher speed
+  analogReadResolution(10); // 10-bit resolution
+  analogReadAveraging(1);   // No averaging
+  // analogReference(DEFAULT); // Use default reference voltage
+
+  // Set up the timer interrupt to sample data at 10kHz
+  sampleTimer.begin(sampleData, 1000000 / sampleRate);
 }
 
-// The interrupt will blink the LED, and keep
-// track of how many times it has blinked.
-// int ledState = LOW;
-// volatile unsigned long blinkCount = 0; // use volatile for shared variables
-
-// functions called by IntervalTimer should be short, run as quickly as
-// possible, and should avoid calling other functions if possible.
-void getData() {
-// Put data into buffer
-  for (int i=0;i<numChannels;i++){
-    buffer[bufferTail][i]=counter;
-  }
-  bufferTail++;
-  if(bufferTail>=bufferLength){
-    bufferTail=0;
-  }
-  counter++;
-  if(bufferHead==bufferTail){
-
-flip=1;}
-  
-}
-
-// The main program will print the blink count
-// to the Arduino Serial Monitor
 void loop() {
-  if(flip==0){
-  while(bufferTail!=bufferHead){
-    String out="[";
-    for(int i=0;i<numChannels;i++){
-      USBSERIAL.write(buffer[bufferHead][i]);
-      // out+=",";
+  if(false){
+    // Serial.println("aghjfdsgojrfogjhaoulwerhfgkmdafhnvkljasdfhgo;lawej gliksrjdfgsdfkbgklsudfh gilsuderh giklasr hgfjkahdgklsdfhiglkjsdfhuijlgdsfkuljhghuaosdli;");
+  }else  if (bufferReady) {
+    // Send the data over USB serial using Serial.write
+    if(sendBuffer==buffer1){
+        Serial.write( buffer1,36);
+      
+    }else{
+      Serial.write( buffer2,36);
     }
-    // USBSERIAL.write(out);
-    bufferHead++;
-    if(bufferHead>=bufferLength){
-      bufferHead=0;
-    }
-    USBSERIAL.println("");
-  }
-  }else{
-    USBSERIAL.println("DFJKHFJKHESADFJKLAGSDFJLGAWKUFYGEFHBHMDSNHBVFJHTDSFVJHYKSDGFKUYWAEYGFOULEGUKfGKYTFE");
+    bufferReady = false;
   }
 
-
-
-  // noInterrupts();
-  // // blinkCopy = blinkCount;
-  // interrupts();
-
+  // Wait a bit before checking the buffer again
   
-  // delay(100);
 }
