@@ -7,11 +7,13 @@ const int sampleRate = 10000; // 10kHz
 const int bufferSize = numPins * 2; // Each reading is 2 bytes
 
 // Buffers for double buffering
-uint8_t buffer1[bufferSize];
-uint8_t buffer2[bufferSize];
-volatile uint8_t* writeBuffer = buffer1;
-volatile uint8_t* sendBuffer = buffer2;
+uint8_t buffer1[1000][bufferSize];
+// uint8_t buffer2[bufferSize];
+// volatile uint8_t* writeBuffer = buffer1;
+// volatile uint8_t* sendBuffer = buffer2;
 volatile bool bufferReady = false;
+volatile int bufferHead=0;
+volatile int bufferTail=0;
 volatile int bufferIndex = 0;
 bool flip=false;
 #define USBSERIAL Serial
@@ -21,29 +23,21 @@ uint16_t counter=0;
 void sampleData() {
   for (int i = 0; i < numPins; i++) {
     int sensorValue = analogRead(analogPins[i]);
-    writeBuffer[bufferIndex++] = counter & 0xFF; // Lower byte
-    writeBuffer[bufferIndex++] = counter>>8; // Upper byte
-    counter+=1;
-    if (bufferIndex >= bufferSize) {
-      bufferIndex = 0;
-      if(bufferReady){
-        flip=true;
-      }
-      bufferReady = true;
-      // Swap buffers
-      if (writeBuffer == buffer1) {
-        writeBuffer = buffer2;
-        sendBuffer = buffer1;
-      } else {
-        writeBuffer = buffer1;
-        sendBuffer = buffer2;
-      }
-    }
+    buffer1[bufferTail][bufferIndex++] = counter & 0xFF; // Lower byte
+    buffer1[bufferTail][bufferIndex++] = counter>>8; // Upper byte
+    
   }
+  counter+=1;
+  bufferIndex=0;
+  bufferTail++;
+  if(bufferTail>=999){
+    bufferTail=0;
+  }
+
 }
 
 void setup() {
-  Serial.begin(230400);
+  Serial.begin(115200);
   while (!Serial); // Wait for the Serial port to be available
 
   // Initialize the analog pins
@@ -54,24 +48,34 @@ void setup() {
   // Configure the ADC for higher speed
   analogReadResolution(10); // 10-bit resolution
   analogReadAveraging(1);   // No averaging
-  // analogReference(DEFAULT); // Use default reference voltage
 
   // Set up the timer interrupt to sample data at 10kHz
   sampleTimer.begin(sampleData, 1000000 / sampleRate);
+  delay(2);
 }
 
 void loop() {
   if(false){
     // Serial.println("aghjfdsgojrfogjhaoulwerhfgkmdafhnvkljasdfhgo;lawej gliksrjdfgsdfkbgklsudfh gilsuderh giklasr hgfjkahdgklsdfhiglkjsdfhuijlgdsfkuljhghuaosdli;");
-  }else  if (bufferReady) {
+  }else  if (true) {
     // Send the data over USB serial using Serial.write
-    if(sendBuffer==buffer1){
-        Serial.write( buffer1,36);
-      
-    }else{
-      Serial.write( buffer2,36);
+
+    static uint8_t localBuffer[36];
+
+
+ 
+
+    while(bufferHead!=bufferTail-1){
+      noInterrupts();
+      memcpy(localBuffer, buffer1[bufferHead], 36);
+      interrupts();
+      Serial.write( localBuffer,36);
+      bufferHead++;
+      if(bufferHead>=999){
+        bufferHead=0;
+      }
     }
-    bufferReady = false;
+    // bufferReady = false;
   }
 
   // Wait a bit before checking the buffer again
