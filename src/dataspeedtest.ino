@@ -7,13 +7,13 @@ const int sampleRate = 10000; // 10kHz
 const int bufferSize = numPins * 2; // Each reading is 2 bytes
 
 // Buffers for double buffering
-uint8_t buffer1[1000][bufferSize];
+uint8_t buffer1[2000][bufferSize];
 // uint8_t buffer2[bufferSize];
 // volatile uint8_t* writeBuffer = buffer1;
 // volatile uint8_t* sendBuffer = buffer2;
 volatile bool bufferReady = false;
 volatile int bufferHead=0;
-volatile int bufferTail=0;
+volatile int bufferTail=2;
 volatile int bufferIndex = 0;
 bool flip=false;
 #define USBSERIAL Serial
@@ -30,7 +30,7 @@ void sampleData() {
   counter+=1;
   bufferIndex=0;
   bufferTail++;
-  if(bufferTail>=999){
+  if(bufferTail>=2000){
     bufferTail=0;
   }
 
@@ -55,9 +55,8 @@ void setup() {
 }
 
 void loop() {
-  if(false){
-    // Serial.println("aghjfdsgojrfogjhaoulwerhfgkmdafhnvkljasdfhgo;lawej gliksrjdfgsdfkbgklsudfh gilsuderh giklasr hgfjkahdgklsdfhiglkjsdfhuijlgdsfkuljhghuaosdli;");
-  }else  if (true) {
+  
+   if (true) {
     // Send the data over USB serial using Serial.write
 
     static uint8_t localBuffer[36];
@@ -65,19 +64,19 @@ void loop() {
 
  
 
-    while(bufferHead!=bufferTail-1){
-      noInterrupts();
-      memcpy(localBuffer, buffer1[bufferHead], 36);
-      interrupts();
-      Serial.write( localBuffer,36);
+    while(bufferHead!=bufferTail){
+      // noInterrupts();
+      // memcpy(localBuffer, buffer1[bufferHead], 36);
+      // interrupts();
+      Serial.write( buffer1[bufferHead],36);
       bufferHead++;
-      if(bufferHead>=999){
+      if(bufferHead>=2000){
         bufferHead=0;
       }
     }
     // bufferReady = false;
   }
-
+}
   // Wait a bit before checking the buffer again
   
-}
+
