@@ -3,7 +3,7 @@
 // Constants
 const int analogPins[] = {A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17};
 const int numPins = 18;
-const int sampleRate = 10000; // 10kHz
+const int sampleRate =10000; // 10kHz
 const int bufferSize = numPins * 2; // Each reading is 2 bytes
 
 // Buffers for double buffering
@@ -23,8 +23,8 @@ uint16_t counter=0;
 void sampleData() {
   for (int i = 0; i < numPins; i++) {
     int sensorValue = analogRead(analogPins[i]);
-    buffer1[bufferTail][bufferIndex++] = counter & 0xFF; // Lower byte
-    buffer1[bufferTail][bufferIndex++] = counter>>8; // Upper byte
+    buffer1[bufferTail][bufferIndex++] = sensorValue & 0xFF; // Lower byte
+    buffer1[bufferTail][bufferIndex++] = sensorValue>>8; // Upper byte
     
   }
   counter+=1;
@@ -46,7 +46,7 @@ void setup() {
   }
 
   // Configure the ADC for higher speed
-  analogReadResolution(10); // 10-bit resolution
+  analogReadResolution(12); // 10-bit resolution
   analogReadAveraging(1);   // No averaging
 
   // Set up the timer interrupt to sample data at 10kHz
@@ -79,4 +79,3 @@ void loop() {
 }
   // Wait a bit before checking the buffer again
   
-
