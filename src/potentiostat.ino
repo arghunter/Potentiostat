@@ -1,9 +1,10 @@
+//Part of the serial interpreter portion of this code is from https://gist.github.com/edgar-bonet/607b387260388be77e96
 #include <Arduino.h>
 #include <avr/pgmspace.h>
 // #define USBSERIAL Serial
 #define BUF_LENGTH 128  /* Buffer for the incoming command. */
 
-static bool do_echo = true;
+static bool do_echo = false;
 // Constants
 const int analogPins[] = {A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17};
 const int numPins = 18;
@@ -13,10 +14,10 @@ const int pwmPinOut = 12;
 
 // const int sampleInterval=1000000/(F*N);
 
-int F=1000;//Frequency
-int Fs = 3000;//Sample Rate
+int F=100;//Frequency
+int Fs = 300;//Sample Rate
 int N=(int)(Fs/F);//Num Samples
-int sampleRate =10000; // 10kHz
+int sampleRate =1000; // 10kHz
 
 uint8_t buffer1[2000][bufferSize];
 volatile bool bufferReady = false;
@@ -161,7 +162,7 @@ void loop() {
         if (data == '\b' || data == '\177') {  // BS and DEL
             if (length) {
                 length--;
-                if (do_echo) SerialUSB1.write("\b \b");
+                
             }
         }
         else if (data == '\r') {
