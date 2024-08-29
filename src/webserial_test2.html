@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSerial Data Recorder</title>
+</head>
+<body>
+    <button id="connect">Connect</button>
+    <button id="start">Start Recording</button>
+    <button id="stop">Stop Recording</button>
+
+    <script>
+        let port;
+        let reader;
+        let writer;
+        let recording = false;
+        let arr = [];
+        let count = 0;
+        const bufferSize = 36; // 18 pins * 2 bytes per pin = 36 bytes
+        const maxCount = 100000; // Example max count, adjust as needed
+        const numPins = 18; // Set the number of pins to 18
+        let accumulatedData = new Uint8Array(); // To accumulate incomplete data
+
+        document.getElementById('connect').addEventListener('click', async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                writer = port.writable.getWriter();
+            } catch (err) {
+                console.error('Failed to connect:', err);
+            }
+        });
+
+        document.getElementById('start').addEventListener('click', async () => {
+            if (!port || !port.readable) {
+                console.error('Serial port not connected or readable');
+                return;
+            }
+            //ok i need a strating byte
+            recording = true;
+            const decoder = new TextDecoderStream();
+            port.readable.pipeTo(decoder.writable);
+            reader = decoder.readable.getReader();
+            arr = [['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12', 'A13', 'A14', 'A15', 'A16', 'A17']]; // Headers for 18 pins
+
+            try {
+                while (recording) {
+                    const { value, done } = await reader.read();
+                    console.log('Data:', value.lengt);
+
+                    if (done) break;
+
+                    if (value) {
+                        const data = new Uint8Array(value); // Get Uint8Array from the value
+                        console.log('Data:', data);
+                        // Append the new data to accumulatedData
+                        const tempData = new Uint8Array(accumulatedData.length + data.length);
+                        tempData.set(accumulatedData);
+                        tempData.set(data, accumulatedData.length);
+                        accumulatedData = tempData;
+
+                        // Process accumulatedData when it reaches or exceeds the expected bufferSize
+                        while (accumulatedData.length >= bufferSize) {
+                            const dataSlice = accumulatedData.slice(0, bufferSize);
+                            accumulatedData = accumulatedData.slice(bufferSize);
+                            console.log('Readings:', dataSlice);
+                            const readings = decodeSerialData(dataSlice.buffer); // Decode the data
+                            arr.push(readings);
+                            count++;
+
+                            if (count >= maxCount) break;
+
+
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Error during reading:', err);
+            } finally {
+                reader.releaseLock();
+                saveDataToCSV();
+            }
+        });
+
+        document.getElementById('stop').addEventListener('click', () => {
+            recording = false;
+        });
+
+        function decodeSerialData(data) {
+            const dataView = new DataView(data);
+            const readings = [];
+            for (let i = 0; i < numPins; i++) {
+                readings.push(dataView.getUint16(i * 2, true)); // true for little-endian
+            }
+            
+            return readings;
+        }
+
+        function saveDataToCSV() {
+            const csvContent = arr.map(row => row.join(",")).join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'data.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            arr = [['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12', 'A13', 'A14', 'A15', 'A16', 'A17']]; // Reset headers after saving
+        }
+    </script>
+</body>
+</html>
