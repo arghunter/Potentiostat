@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Potentiostat WebSerial Data Recorder</title>
+    <style>
+        .status {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .connected {
+            color: green;
+        }
+        .disconnected {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <button id="connect">Connect To Read Port</button>
+    <span id="read-status" class="status disconnected">Disconnected</span>
+    <br>
+
+    <button id="control">Connect to Control Port</button>
+    <span id="control-status" class="status disconnected">Disconnected</span>
+    <br>
+    <button id="start">Start Recording</button>
+    <button id="stop">Stop Recording</button>
+    
+    <label for="pwmFrequency">Set PWM Value:</label>
+    <input type="number" id="pwmFrequency" name="pwmFrequency" min="0" max="2500" step="1">
+    <button id="pwm">Set PWM</button>
+    <label for="samplerateField">Set Sample Rate:</label>
+    <input type="number" id="samplerateField" name="samplerateField" min="0" max="12000" step="1">
+    <button id="samplerate">Set SampleRate</button>
+    <button id="on">LED ON</button>
+    <button id="off">LED OFF</button>
+    <script>
+        let port;
+        let reader;
+        let writer;
+        let recording = false;
+        let arr = [];
+        let count = 0;
+        const bufferSize = 36; // 18 pins * 2 bytes per pin = 36 bytes
+        const maxCount = 100000; // Example max count, adjust as needed
+        const numPins = 18; // Set the number of pins to 18
+        let accumulatedData = new Uint8Array(); // To accumulate incomplete data
+        let pwm = 300;
+       
+        let duration = 5;
+        let sampleRate = 5000;
+        const readStatus = document.getElementById('read-status');
+        const controlStatus = document.getElementById('control-status');
+        document.getElementById('connect').addEventListener('click', async () => {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200, bufferSize: 2047 });
+                writer = port.writable.getWriter();
+                readStatus.textContent = 'Connected';
+                readStatus.classList.remove('disconnected');
+                readStatus.classList.add('connected');
+            } catch (err) {
+                console.error('Failed to connect:', err);
+                readStatus.textContent = 'Disconnected';
+                readStatus.classList.remove('connected');
+                readStatus.classList.add('disconnected');
+            }
+        });
+        document.getElementById('control').addEventListener('click', async () => {
+            try {
+                
+                port2 = await navigator.serial.requestPort();
+                await port2.open({ baudRate: 9600 }); 
+                
+                
+                writer = port2.writable.getWriter();
+                controlStatus.textContent = 'Connected';
+                controlStatus.classList.remove('disconnected');
+                controlStatus.classList.add('connected');
+            } catch (err) {
+                console.error('Failed to connect:', err);
+                controlStatus.textContent = 'Disconnected';
+                controlStatus.classList.remove('connected');
+                controlStatus.classList.add('disconnected');
+            }
+        });
+
+        document.getElementById('start').addEventListener('click', async () => {
+            if (!port || !port.readable) {
+                console.error('Serial port not connected or readable');
+                return;
+            }
+        
+            recording = true;
+            reader = port.readable.getReader();
+            arr = [['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12', 'A13', 'A14', 'A15', 'A16', 'A17']]; // Headers for 18 pins
+        
+            try {
+                while (recording) {
+                    const { value, done } = await reader.read();
+                    
+                    if (done) break;
+        
+                    if (value) {
+                        // Append the new data to accumulatedData
+                        const tempData = new Uint8Array(accumulatedData.length + value.length);
+                        tempData.set(accumulatedData);
+                        tempData.set(value, accumulatedData.length);
+                        accumulatedData = tempData;
+        
+                        // Process accumulatedData when it reaches or exceeds the expected bufferSize
+                        while (accumulatedData.length >= bufferSize) {
+                            const dataSlice = accumulatedData.slice(0, bufferSize);
+                            accumulatedData = accumulatedData.slice(bufferSize);
+                            
+                            const readings = decodeSerialData(dataSlice.buffer); // Decode the data
+                            arr.push(readings);
+                            count++;
+        
+                            if (count >= maxCount) break;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Error during reading:', err);
+            } finally {
+                reader.releaseLock();
+                saveDataToCSV();
+            }
+        });
+        
+
+        document.getElementById('stop').addEventListener('click', () => {
+            recording = false;
+        });
+        document.getElementById('pwm').addEventListener('click', async () => {
+            if (writer) {
+                pwm=document.getElementById('pwmFrequency').value
+                const message = "pwm "+pwm+" "+sampleRate+"\r";
+                const data = new TextEncoder().encode(message);
+
+                try {
+                    await writer.write(data);
+                    console.log('Message sent:', message);
+                } catch (err) {
+                    console.error('Failed to send message:', err);
+                }
+            }
+        });
+        document.getElementById('off').addEventListener('click', async () => {
+            if (writer) {
+                const message = "write 13 0\r";
+                const data = new TextEncoder().encode(message);
+
+                try {
+                    await writer.write(data);
+                    console.log('Message sent:', message);
+                } catch (err) {
+                    console.error('Failed to send message:', err);
+                }
+            }
+        });
+        document.getElementById('on').addEventListener('click', async () => {
+            if (writer) {
+                const message = "write 13 1\r";
+                const data = new TextEncoder().encode(message);
+
+                try {
+                    await writer.write(data);
+                    console.log('Message sent:', message);
+                } catch (err) {
+                    console.error('Failed to send message:', err);
+                }
+            }
+        });
+
+        function decodeSerialData(data) {
+            const dataView = new DataView(data);
+            const readings = [];
+            for (let i = 0; i < numPins; i++) {
+                readings.push(dataView.getUint16(i * 2, true)); // true for little-endian
+            }
+            
+            return readings;
+        }
+       
+
+        function saveDataToCSV() {
+            const csvContent = arr.map(row => row.join(",")).join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'data.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            arr = [['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12', 'A13', 'A14', 'A15', 'A16', 'A17']]; // Reset headers after saving
+        }
+    </script>
+</body>
+</html>
