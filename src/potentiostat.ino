@@ -11,13 +11,16 @@ const int numPins = 18;
 const int bufferSize = numPins * 2; // Each reading is 2 bytes
 
 const int pwmPinOut = 12;
-
+uint32_t PWM_Pins[] = { 4, 5, 6, 7, 0, 1, 2, 3, 8, 9, 10, 11, 28, 29, 36, 37, 13, 33 };
+float dutyCycle[]   = { 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f,50.0f,50.0f };  
+float frequency = 2000.0f;  // Same frequency for all channels
+#define NUM_OF_PINS       ( sizeof(PWM_Pins) / sizeof(uint32_t) )
 // const int sampleInterval=1000000/(F*N);
 
 int F=100;//Frequency
 int Fs = 300;//Sample Rate
 int N=(int)(Fs/F);//Num Samples
-int sampleRate =1000; // 10kHz
+int sampleRate =10000; // 10kHz
 
 uint8_t buffer1[2000][bufferSize];
 volatile bool bufferReady = false;
@@ -33,8 +36,8 @@ uint16_t counter=0;
 void sampleData() {
   for (int i = 0; i < numPins; i++) {
     int sensorValue = analogRead(analogPins[i]);
-    buffer1[bufferTail][bufferIndex++] = counter & 0xFF; // Lower byte
-    buffer1[bufferTail][bufferIndex++] = counter>>8; // Upper byte
+    buffer1[bufferTail][bufferIndex++] = sensorValue & 0xFF; // Lower byte
+    buffer1[bufferTail][bufferIndex++] = sensorValue>>8; // Upper byte
   }
 
   counter+=1;
@@ -45,28 +48,14 @@ void sampleData() {
   }
 
 }
-void sendSignal() {
-  static int index = 0;
 
-  analogWrite(pwmPinOut, (int)samples[index]); // Output the current sample
-
-  index++;
-  if (index >= N) {
-    index = 0; // Loop back to the beginning of the sine wave
+void configurePWM(){
+  for (uint8_t i = 0; i < NUM_OF_PINS; i++) {
+    // Set the frequency for each pin
+    analogWriteFrequency(PWM_Pins[i], frequency);
+    // Set the duty cycle (value between 0 and 255)
+    analogWrite(PWM_Pins[i], (uint8_t)(dutyCycle[i] / 100.0f * 255));
   }
-}
-void setPWM(int frequency, int samplerate){
-  F=frequency;
-  Fs=samplerate;
-  N=(int)(Fs/F);
-  for(int i=0;i<1000;i++){
-    if(i<N){
-    samples[i] = 2048 + 2047 * sin(2 * PI * i / N);
-    }else{
-      samples[i]=0;
-    }
-  }
-  outTimer.update(1000000 / Fs);
 }
 void setSampleRate(int samplerate){
   sampleRate=samplerate;
@@ -104,10 +93,16 @@ static void exec(char *cmdline)
         int pin = atoi(strsep(&cmdline, " "));
         int value = atoi(cmdline);
         analogWrite(pin, value);
-    } else if (strcmp_P(command, PSTR("pwm"))==0){
-        int frequency = atoi(strsep(&cmdline, " "));
-        int samplerate = atoi(cmdline);
-        setPWM(frequency,samplerate);
+    } else if (strcmp_P(command, PSTR("pwmfreq"))==0){
+        int F = atoi(cmdline);
+        frequency=F;
+    } else if (strcmp_P(command, PSTR("pwmpin"))==0){
+        int pin = atoi(strsep(&cmdline, " "));
+        float duty_val = atof(cmdline);
+        dutyCycle[pin]=duty_val;
+        
+    } else if (strcmp_P(command, PSTR("pwmapply"))==0){
+        configurePWM();
     } else if (strcmp_P(command, PSTR("readrate")) == 0) {
         int samplerate = atoi(strsep(&cmdline, " "));
         setSampleRate(samplerate);
@@ -123,10 +118,6 @@ void setup() {
   SerialUSB1.begin(9600);
   
 
-  for(int i=0;i<N;i++){
-    
-    samples[i] = 2048 + 2047 * sin(2 * PI * i / N);
-  }
   // Initialize the analog pins
   for (int i = 0; i < numPins; i++) {
     pinMode(analogPins[i], INPUT);
@@ -134,9 +125,11 @@ void setup() {
   // Configure the ADC for high speed
   analogReadResolution(12); // 12-bit resolution
   analogReadAveraging(1);   // No averaging
-  analogWriteResolution(12);
+  // analogWriteResolution(12);
   // Set up the timer interrupt to sample data at the samplerate
-  outTimer.begin(sendSignal,1000000 / Fs);
+  // outTimer.begin(sendSignal,1000000 / Fs);
+  configurePWM();
+
   sampleTimer.begin(sampleData, 1000000 / sampleRate);
 
   delay(2);
