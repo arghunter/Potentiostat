@@ -5,3 +5,12 @@ Instructions and Demos can be found at : https://www.youtube.com/watch?v=2Bd75sJ
 The hardware works and currently work is being done on a web interface.
 One possible application of this is to run many blood tests in parralel.
 Note: Run the .ino on a Teensy 4.1 with Dual Serial and an overclock of 720Mhz.
+
+For CSV Logger:
+the arguments are
+1. Read Serial Port
+2. Control Serial Port
+3. Duration
+4. Samplerate (of the adc pins)
+5. PWM Pin (Needs to be removed, don't use)
+6. PWM Samplerate 
